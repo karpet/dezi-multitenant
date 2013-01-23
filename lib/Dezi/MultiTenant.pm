@@ -132,6 +132,13 @@ sub app {
 
 }
 
+=head2 about( I<plack_request>, I<loaded> )
+
+Returns Plack::Response-like array ref
+describing the multi-tenant application.
+
+=cut
+
 sub about {
     my ( $class, $req, $loaded ) = @_;
 
