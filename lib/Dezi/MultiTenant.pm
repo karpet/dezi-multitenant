@@ -1,52 +1,182 @@
 package Dezi::MultiTenant;
-
-use warnings;
 use strict;
+use warnings;
+use Dezi::Server;
+use Dezi::MultiTenant::Config;
+use JSON;
+use Plack::Builder;
+use Plack::Request;
+use Plack::App::URLMap;
+use Data::Dump qw( dump );
+use Carp;
+use Module::Load;
+use Scalar::Util qw( blessed );
+
+our $VERSION = 0.001;
 
 =head1 NAME
 
-Dezi::MultiTenant - The great new Dezi::MultiTenant!
-
-=head1 VERSION
-
-Version 0.01
-
-=cut
-
-our $VERSION = '0.01';
-
+Dezi::MultiTenant - multiple Dezi::Server applications in a single instance
 
 =head1 SYNOPSIS
 
-Quick summary of what the module does.
+ % dezi --server-class Dezi::MultiTenant --dezi-config myconfig.pl
+ 
+ # or in your own Plack app
+ 
+ use Plack::Runner;
+ use Dezi::MultiTenant;
+ 
+ my $multitenant_config = { 
+   'foo' => Dezi::Config->new(\%foo_opts),
+   'bar' => Dezi::Config->new(\%bar_opts),
+ };
+ 
+ my $runner = Plack::Runner->new();
+ my $app = Dezi::MultiTenant->app( $multitenant_config );
+ $runner->run($app);
+ 
+ # /foo mounts a Dezi::Server
+ # /bar mounts a Dezi::Server
+ 
+=head1 DESCRIPTION
 
-Perhaps a little code snippet.
+Dezi::MultiTenant provides a simple way to mount multiple
+Dezi::Server applications in a single Plack app using
+a single configuration structure.
 
-    use Dezi::MultiTenant;
+Dezi::Server allows you to serve multiple indexes, but all
+the indexes must have identical schemas.
 
-    my $foo = Dezi::MultiTenant->new();
-    ...
+Dezi::MultiTenant allows you to server multiple indexes per
+server, and each server can have a different schema, as well
+as individual administration, logging, unique configuration, etc.
 
-=head1 EXPORT
-
-A list of functions that can be exported.  You can delete this section
-if you don't export anything, such as for a purely object-oriented module.
-
-=head1 FUNCTIONS
-
-=head2 function1
+=head1 METHODS
 
 =cut
 
-sub function1 {
-}
+=head2 app( I<config> )
 
-=head2 function2
+Returns Plack $app instance via Plack::Builder. 
+
+I<config> should either be a hashref with keys representing each
+Dezi::Server's mount point, or a Dezi::MultiTenant::Config object.
+By default the root '/' mount point is reserved for the 
+Dezi::MultiTenant->about() method response. Hash keys should have
+the '/' prefix (same syntax as L<Plack::App::URLMap>).
 
 =cut
 
-sub function2 {
+sub app {
+    my $class = shift;
+    my $config = shift or croak "config required";
+    my $mt_config;
+    if ( blessed $config) {
+        if ( $config->isa('Dezi::MultiTenant::Config') ) {
+            $mt_config = $config;
+        }
+        else {
+            croak "config is not a Dezi::MultiTenant::Config-derived object";
+        }
+    }
+    else {
+        $mt_config = Dezi::MultiTenant::Config->new($config);
+    }
+
+    my $url_map = Plack::App::URLMap->new();
+    my @loaded;
+    for my $path ( $mt_config->paths() ) {
+        $url_map->map(
+            $path => Dezi::Server->app( $mt_config->config_for($path) ) );
+        push @loaded, $path;
+    }
+
+    return builder {
+
+        # global logging
+        enable "SimpleLogger", level => $config->{'debug'} ? "debug" : "warn";
+
+        # optional gzip compression for clients that request it
+        # client must set "Accept-Encoding" request header
+        enable "Deflater",
+            content_type => [
+            'text/css',        'text/html',
+            'text/javascript', 'application/javascript',
+            'text/xml',        'application/xml',
+            'application/json',
+            ],
+            vary_user_agent => 1;
+
+        # / is self-description
+        $url_map->map(
+            '/' => sub {
+                my $req = Plack::Request->new(shift);
+                return $class->about( $req, \@loaded );
+            }
+        );
+
+        $url_map->map(
+            '/favicon.ico' => sub {
+                my $req = Plack::Request->new(shift);
+                my $res = $req->new_response();
+                $res->redirect( 'http://dezi.org/favicon.ico', 301 );
+                $res->finalize();
+            }
+        );
+
+        # TODO /admin
+
+        $url_map->to_app;
+    };
+
 }
+
+sub about {
+    my ( $class, $req, $loaded ) = @_;
+
+    if ( $req->path ne '/' ) {
+        my $resp = 'Resource not found';
+        return [
+            404,
+            [   'Content-Type'   => 'text/plain',
+                'Content-Length' => length $resp,
+            ],
+            [$resp]
+        ];
+    }
+
+    my $base_uri = $req->base;
+    my %avail    = ();
+    for my $i (@$loaded_indexes) {
+
+        # virtual host check
+        if ( $i =~ m!^https?:! ) {
+            $avail{$i} = $i;
+        }
+        else {
+            $avail{$i} = $base_uri . $i;
+        }
+    }
+
+    my $about = {
+        description => $class,
+        version     => $VERSION,
+        available   => \%avail,
+    };
+    my $resp = to_json($about);
+    return [
+        200,
+        [   'Content-Type'   => 'application/json',
+            'Content-Length' => length $resp,
+        ],
+        [$resp],
+    ];
+}
+
+1;
+
+__END__
 
 =head1 AUTHOR
 
@@ -57,9 +187,6 @@ Peter Karman, C<< <karman at cpan.org> >>
 Please report any bugs or feature requests to C<bug-dezi-multitenant at rt.cpan.org>, or through
 the web interface at L<http://rt.cpan.org/NoAuth/ReportBug.html?Queue=Dezi-MultiTenant>.  I will be notified, and then you'll
 automatically be notified of progress on your bug as I make changes.
-
-
-
 
 =head1 SUPPORT
 
@@ -107,4 +234,3 @@ See http://dev.perl.org/licenses/ for more information.
 
 =cut
 
-1; # End of Dezi::MultiTenant
