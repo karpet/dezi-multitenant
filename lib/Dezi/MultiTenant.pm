@@ -155,7 +155,7 @@ sub about {
 
     my $base_uri = $req->base;
     my %avail    = ();
-    for my $i (@$loaded_indexes) {
+    for my $i (@$loaded) {
 
         # virtual host check
         if ( $i =~ m!^https?:! ) {
