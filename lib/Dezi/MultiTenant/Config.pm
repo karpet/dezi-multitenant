@@ -6,6 +6,7 @@ use Dezi::Config;
 use Plack::Util::Accessor qw(
     configs
 );
+use Data::Dump qw( dump );
 
 our $VERSION = '0.001';
 
@@ -59,10 +60,33 @@ sub new {
         croak "config should be a hashref";
     }
 
+    #dump $config;
+
+    # some "meta" keys apply to all servers so propogate them
+    # unless explicitly set already
+    my %meta_config
+        = map { $_ => $config->{$_} } grep { !m,^(/|http), } keys %$config;
+
+    #dump \%meta_config;
+
     my %configs;
     for my $key ( keys %$config ) {
-        $configs{$key} = Dezi::Config->new( $config->{$key} );
+
+        next if exists $meta_config{$key};
+
+        # merge in meta
+        my $single_config = $config->{$key};
+        for my $k ( keys %meta_config ) {
+            next if exists $single_config->{$k};
+            $single_config->{$k} = $meta_config{$k};
+        }
+
+        #dump $single_config;
+
+        $configs{$key} = Dezi::Config->new($single_config);
     }
+
+    #dump \%configs;
 
     return bless { configs => \%configs }, $class;
 }

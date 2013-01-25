@@ -88,7 +88,11 @@ sub app {
     my @loaded;
     for my $path ( $mt_config->paths() ) {
         $url_map->map(
-            $path => Dezi::Server->app( $mt_config->config_for($path) ) );
+            $path => builder {
+                mount '/' =>
+                    Dezi::Server->app( $mt_config->config_for($path) );
+            }
+        );
         push @loaded, $path;
     }
 
@@ -154,7 +158,8 @@ sub about {
     }
 
     my $base_uri = $req->base;
-    my %avail    = ();
+    $base_uri =~ s,/$,,;    # zap any trailing /
+    my %avail = ();
     for my $i (@$loaded) {
 
         # virtual host check
