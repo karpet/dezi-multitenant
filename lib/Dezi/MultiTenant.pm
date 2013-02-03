@@ -229,10 +229,6 @@ L<http://search.cpan.org/dist/Dezi-MultiTenant/>
 
 =back
 
-
-=head1 ACKNOWLEDGEMENTS
-
-
 =head1 COPYRIGHT & LICENSE
 
 Copyright 2013 Peter Karman.
