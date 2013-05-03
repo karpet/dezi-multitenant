@@ -8,7 +8,7 @@ use Plack::Util::Accessor qw(
 );
 use Data::Dump qw( dump );
 
-our $VERSION = '0.001';
+our $VERSION = '0.002';
 
 =head1 NAME
 

@@ -101,6 +101,9 @@ sub app {
         # global logging
         enable "SimpleLogger", level => $config->{'debug'} ? "debug" : "warn";
 
+        # JSONP response based on 'callback' param
+        enable "JSONP";
+
         # optional gzip compression for clients that request it
         # client must set "Accept-Encoding" request header
         enable "Deflater",

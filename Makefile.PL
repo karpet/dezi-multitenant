@@ -7,6 +7,7 @@ name 'Dezi-MultiTenant';
 all_from 'lib/Dezi/MultiTenant.pm';
 requires 'Test::More'                  => 0;
 requires 'Plack::Middleware::Deflater' => 0;
+requires 'Plack::Middleware::JSONP'    => 0;
 requires 'Dezi'                        => 0.002006;
 
 perl_version '5.8.3';

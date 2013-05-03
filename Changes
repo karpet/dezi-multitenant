@@ -3,3 +3,5 @@ Revision history for Dezi-MultiTenant
 0.001   2 Feb 2013
         First version, released on an unsuspecting world.
 
+0.002   3 May 2013
+        * enable JSONP plugin
